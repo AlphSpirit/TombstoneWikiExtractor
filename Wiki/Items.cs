@@ -74,9 +74,22 @@ public partial class Items
 		var itemName = itemJson.GetProperty("m_Name").GetString()!;
 		var itemDescription = itemJson.GetProperty("Description").GetString();
 		var itemValue = itemJson.GetProperty("Value").GetInt32();
+		var itemType = itemJson.GetProperty("ItemType").GetInt32();
+		var itemTypes = ItemType.GetTypes(itemType);
+		var joinedTypes = string.Join(", ", itemTypes);
 		var client = new HttpClient();
 		var existingPageResponse = await client.GetAsync($"https://tombstonemmowiki.org/index.php?action=raw&title={HttpUtility.UrlEncode(itemName)}");
+		if (!existingPageResponse.IsSuccessStatusCode)
+		{
+			Console.WriteLine($"❌ Failed to get {itemName}, retrying...");
+			await EditPage(itemId, bot);
+			return;
+		}
 		var pageContent = await existingPageResponse.Content.ReadAsStringAsync();
+		if (pageContent.Contains("<html>") || pageContent.Contains("MediaWiki"))
+		{
+			Console.WriteLine($"⚠️ Page for {itemName} is corrupted, might need a manual fix");
+		}
 		var newPage = pageContent == "";
 
 		if (pageContent.Contains("{{ItemAcquisition}}") && pageContent.Contains("{{ItemUsedIn}}")
@@ -88,12 +101,12 @@ public partial class Items
 		// Update ItemFloat
 		if (!pageContent.Contains("{{ItemFloat"))
 		{
-			pageContent = $"\n\n{{{{ItemFloat|name={itemName}\n|description={itemDescription}\n|value={itemValue}\n}}}}\n\n" + pageContent;
+			pageContent = $"\n\n{{{{ItemFloat|name={itemName}\n|type={joinedTypes}\n|description={itemDescription}\n|value={itemValue}\n}}}}\n\n" + pageContent;
 		}
 		else
 		{
 			var regex = new Regex("{{ItemFloat[a-zA-Z\r\n|{}= .0-9,']*?}}");
-			pageContent = regex.Replace(pageContent, $"{{{{ItemFloat\n|name={itemName}\n|description={itemDescription}\n|value={itemValue}\n}}}}\n\n");
+			pageContent = regex.Replace(pageContent, $"{{{{ItemFloat\n|name={itemName}\n|type={joinedTypes}\n|description={itemDescription}\n|value={itemValue}\n}}}}\n\n");
 		}
 
 		// Update ItemAcquisition
@@ -135,11 +148,11 @@ public partial class Items
 			await EditPage(itemId, bot);
 			return;
 		}
-		if (newPage)
-		{
-			Console.WriteLine($"📝 Created {itemName}");
-			return;
-		}
-		Console.WriteLine($"📝 Edited {itemName}");
+		// if (newPage)
+		// {
+		// 	Console.WriteLine($"📝 Created {itemName}");
+		// 	return;
+		// }
+		// Console.WriteLine($"📝 Edited {itemName}");
 	}
 }
