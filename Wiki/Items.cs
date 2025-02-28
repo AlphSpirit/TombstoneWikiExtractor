@@ -23,6 +23,7 @@ public partial class Items
 
 		Console.WriteLine("📥 Downloading item files...");
 		await DownloadItemFiles();
+		// await DownloadAllBundleFiles();
 
 		Console.WriteLine("🔪 Editing items...");
 		Parallel.ForEach(itemIds, id => EditPage(id, bot).Wait());
@@ -59,6 +60,25 @@ public partial class Items
 		process.WaitForExit();
 		File.Delete("items_assets_all.bundle");
 		Console.WriteLine("📦 Item files extracted");
+	}
+
+	private async Task DownloadAllBundleFiles()
+	{
+		var client = new HttpClient();
+		var allBundleIds = internalIds.Where(id => id.StartsWith("http") && id.EndsWith(".bundle"));
+		foreach (var id in allBundleIds)
+		{
+			var fileName = id.Split('/').Last();
+			Console.WriteLine($"📥 Downloading {fileName}...");
+			var response = await client.GetAsync(id);
+			File.WriteAllBytes(fileName, await response.Content.ReadAsByteArrayAsync());
+			var process = new Process();
+			process.StartInfo.FileName = "dotnet";
+			process.StartInfo.Arguments = $"AssetStudioModCLI/AssetStudioModCLI.dll {fileName} -o Assets/test --log-output file";
+			process.Start();
+			process.WaitForExit();
+			File.Delete(fileName);
+		}
 	}
 
 	private async Task EditPage(string itemId, Bot bot)
@@ -134,7 +154,8 @@ public partial class Items
 			new KeyValuePair<string, string>("format", "json"),
 			new KeyValuePair<string, string>("title", itemName),
 			new KeyValuePair<string, string>("text", pageContent),
-			new KeyValuePair<string, string>("token", bot.EditToken)
+			new KeyValuePair<string, string>("token", bot.EditToken),
+			new KeyValuePair<string, string>("bot", "True")
 		]);
 		var editRequest = new HttpRequestMessage(HttpMethod.Post, "https://tombstonemmowiki.org/api.php")
 		{
